@@ -92,7 +92,7 @@ ufcg_uas_sumario = read_csv("ufcg-201704-sumario-UAs-wide.csv",
 )
 ```
 
-Os dados vêm do portal da transparência do governo federal, e são referentes a **abril de 2017**.  Filtrei funcionários da UFCG, e abaixo apenas as unidades da organização de lotação que tem ao menos um professor.
+Vamos utilizar alguns dados retirados do portal da transparência do governo federal, e que são referentes a **abril de 2017**.  Foram filtrados funcionários da UFCG, e apenas as unidades da organização de lotação que tem ao menos um professor.
 
 ```{r, echo=FALSE, fig.height= 8, fig.width= 8}
 ufcg_uas_counts %>% 
