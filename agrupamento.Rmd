@@ -8,6 +8,7 @@ Nessa análise, iremos dividir as Unidades Acadêmicas da UFCG em diferentes gru
 ```{r, echo=FALSE, warning=FALSE}
 suppressWarnings(library(tidyverse))
 suppressWarnings(library(plotly))
+suppressWarnings(library(cluster))
 ufcg_uas_sumario = read_csv("ufcg-201704-sumario-UAs-wide.csv", 
                             col_types = cols(
                                 UORG_LOTACAO = col_character(),
@@ -21,7 +22,7 @@ ufcg_uas_sumario = read_csv("ufcg-201704-sumario-UAs-wide.csv",
 )
 ```
 
-## Funcionários na UA que não são professores
+#### Funcionários na UA que não são professores
 
 ```{r}
 p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
@@ -36,7 +37,7 @@ ggplotly(p, tooltip = "text")
 ```
 
 
-## Professores com carga horária 20h/semana
+#### Professores com carga horária 20h/semana
 
 ```{r}
 p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
@@ -51,7 +52,7 @@ ggplotly(p, tooltip = "text")
 ```
 Aqui, vemos que a maioria das Unidade Acadêmicas não possui nenhum professor com carga horária de 20h/semana, mas a *Unidade Acadêmica de Medicina* chama atenção com 65 professores com essa carga horária.
 
-## Professores com carga horária 40h/semana na UA, sejam eles Dedicação Exclusiva ou não
+#### Professores com carga horária 40h/semana na UA, sejam eles Dedicação Exclusiva ou não
 
 ```{r}
 p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
@@ -66,7 +67,7 @@ ggplotly(p, tooltip = "text")
 ```
 
 
-## 25 percentil da idade dos funcionários *no cargo* 
+#### 25 percentil da idade dos funcionários *no cargo* 
 
 ```{r}
 p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
@@ -82,7 +83,7 @@ ggplotly(p, tooltip = "text")
 
 *Exemplo de interpretação: Na Unidade Acadêmica de Engenharia de Materiais, 25% dos funcionários tem 21.73 anos ou menos na profissão.*
 
-## Idade mediana dos funcionários *no cargo* 
+#### Idade mediana dos funcionários *no cargo* 
 
 ```{r}
 p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
@@ -98,7 +99,7 @@ ggplotly(p, tooltip = "text")
 
 A maioria dos funcionários no cargo está entre 6 e 9.
 
-## 75 percentil da idade dos funcionários *no cargo* 
+#### 75 percentil da idade dos funcionários *no cargo* 
 
 ```{r}
 p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
@@ -110,5 +111,48 @@ p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO,
     theme(legend.position="none") +
   geom_point(colour = "#12131c") + coord_flip()
 ggplotly(p, tooltip = "text")
+```
 
 
+*Exemplo de interpretação: Na Unidade Acadêmica de Sistemas e computação, 75% dos funcionários tem 22.09 anos ou menos na profissão.*
+
+
+### Escolha do número K
+
+#### GAP statistic
+
+```{r}
+plot_clusgap = function(clusgap, title="Gap Statistic calculation results"){
+    require("ggplot2")
+    gstab = data.frame(clusgap$Tab, k=1:nrow(clusgap$Tab))
+    p = ggplot(gstab, aes(k, gap)) + geom_line(colour = "#292c40") + geom_point(size=5, colour = "#292c40")
+    p = p + geom_errorbar(aes(ymax=gap+SE.sim, ymin=gap-SE.sim), colour = "#292c40", width = .2)
+    p = p + ggtitle(title)
+    return(p)
+}
+
+ufcg.scaled = ufcg_uas_sumario %>% 
+    select(-UORG_LOTACAO)
+
+gaps <- ufcg.scaled %>% 
+    clusGap(FUN = kmeans,
+            nstart = 20,
+            K.max = 8,
+            B = 200)
+plot_clusgap(gaps)
+
+```
+
+Segundo essa estatística, 8 seria o valor de K ideal.
+
+### K-means
+
+```{r}
+km = kmeans(ufcg.scaled, 
+            centers = 8, 
+            nstart = 100)
+
+km
+
+plot(ufcg.scaled)
+```
