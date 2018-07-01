@@ -1,0 +1,225 @@
+---
+title: "Agrupamento sobre dados da UFCG"
+output:
+  html_document:
+    df_print: paged
+---
+
+Nessa análise, iremos dividir as Unidades Acadêmicas da UFCG em diferentes grupos, as variáveis utilizadas para fazer esse agrupamento serão exploradas a seguir. </br>
+
+*Antes de visualizar os dados é importante saber que **percentis** são medidas que dividem a amostra ordenada (por ordem crescente dos dados) em 100 partes, cada uma com uma percentagem de dados aproximadamente igual.*
+
+```{r, echo=FALSE, warning=FALSE}
+suppressWarnings(library(tidyverse))
+suppressWarnings(library(plotly))
+suppressWarnings(library(cluster))
+suppressWarnings(library(GGally))
+suppressWarnings(library(IDPmisc))
+suppressWarnings(library(broom))
+suppressWarnings(library(here))
+ufcg_uas_sumario = read_csv(here("data/ufcg-201704-sumario-UAs-wide.csv"), 
+                            col_types = cols(
+                                UORG_LOTACAO = col_character(),
+                                Outro = col_double(),
+                                `Professor 20h` = col_double(),
+                                `Professor 40h ou DE` = col_double(),
+                                idade_25perc = col_double(),
+                                idade_mediana = col_double(),
+                                idade_75perc = col_double()
+                            )
+)
+
+```
+
+#### Funcionários na UA que não são professores
+
+```{r}
+p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
+             y=Outro,
+             text = paste("UA:",UORG_LOTACAO,
+                            "\nQuantidade:",
+                            Outro))) +
+     labs(y = "Quantidade", x = "UA")+
+    theme(legend.position="none") +
+  geom_point(colour = "#882C3E") + coord_flip()
+ggplotly(p, tooltip = "text")
+```
+
+
+#### Professores com carga horária 20h/semana
+
+```{r}
+p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
+             y=`Professor 20h`,
+             text = paste("UA:",UORG_LOTACAO,
+                            "\nQuantidade:",
+                            `Professor 20h`))) +
+     labs(y = "Quantidade", x = "UA")+
+    theme(legend.position="none") +
+  geom_point(colour = "#50dd66") + coord_flip()
+ggplotly(p, tooltip = "text")
+```
+Aqui, vemos que a maioria das Unidade Acadêmicas não possui nenhum professor com carga horária de 20h/semana, mas a *Unidade Acadêmica de Medicina* chama atenção com 65 professores com essa carga horária.
+
+#### Professores com carga horária 40h/semana na UA, sejam eles Dedicação Exclusiva ou não
+
+```{r}
+p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
+             y=`Professor 40h ou DE`,
+             text = paste("UA:",UORG_LOTACAO,
+                            "\nQuantidade:",
+                            `Professor 40h ou DE`))) +
+     labs(y = "Quantidade", x = "UA")+
+    theme(legend.position="none") +
+  geom_point(colour = "#ED6471") + coord_flip()
+ggplotly(p, tooltip = "text")
+```
+
+
+#### 25 percentil da idade dos funcionários *no cargo* 
+
+```{r}
+p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
+             y=idade_25perc,
+             text = paste("UA:",UORG_LOTACAO,
+                            "\n25 percentil:",
+                            idade_25perc))) +
+     labs(y = "25 Percentil", x = "UA")+
+    theme(legend.position="none") +
+  geom_point(colour = "#b0b3cc") + coord_flip()
+ggplotly(p, tooltip = "text")
+```
+
+*Exemplo de interpretação: Na Unidade Acadêmica de Engenharia de Materiais, 25% dos funcionários tem 21.73 anos ou menos na profissão.*
+
+#### Idade mediana dos funcionários *no cargo* 
+
+```{r}
+p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
+             y=idade_mediana,
+             text = paste("UA:",UORG_LOTACAO,
+                            "\nIdade Mediana:",
+                            idade_mediana))) +
+     labs(y = "Idade mediana", x = "UA")+
+    theme(legend.position="none") +
+  geom_point(colour = "#5f6694") + coord_flip()
+ggplotly(p, tooltip = "text")
+```
+
+A maioria dos funcionários no cargo está entre 6 e 9.
+
+#### 75 percentil da idade dos funcionários *no cargo* 
+
+```{r}
+p = ggplot(ufcg_uas_sumario, aes(x=UORG_LOTACAO, 
+             y=`idade_75perc`,
+             text = paste("UA:",UORG_LOTACAO,
+                            "\n75 percentil:",
+                            `idade_75perc`))) +
+     labs(y = "75 percentil", x = "UA")+
+    theme(legend.position="none") +
+  geom_point(colour = "#12131c") + coord_flip()
+ggplotly(p, tooltip = "text")
+```
+
+
+*Exemplo de interpretação: Na Unidade Acadêmica de Sistemas e computação, 75% dos funcionários tem 22.09 anos ou menos na profissão.*
+
+
+### Escolha do número K
+
+Para agrupar as unidades em diferentes grupos, o primeiro passo é descobrir a quantidade de grupos ideal. Existem diversas formas de calcular esse número, aqui, iremos utilizar a medida da razão [betweenss/totss](https://github.com/nazareno/ciencia-de-dados-1/blob/master/3-Agrupamento-e-PCA/2-kmeans-e-mais-exemplos.Rmd#betweentotss). </br>
+
+Antes, vamos fazer uma transformação nos dados com o objetivo de facilitar a identificação dos grupos. A proporção de diferença entre as observações será mantida.
+
+```{r}
+ufcg.scaled = ufcg_uas_sumario %>% 
+  mutate_at(vars(Outro,
+                 `Professor 20h`,
+                 `Professor 40h ou DE`,
+                 idade_25perc,
+                 idade_mediana,
+                 idade_75perc),
+            funs(log))
+
+```
+
+#### Betweenss/totss
+
+```{r}
+set.seed(31)
+# 
+explorando_k = tibble(k = 1:15) %>%
+  group_by(k) %>% 
+  do(
+    kmeans(NaRV.omit(select(ufcg.scaled, -UORG_LOTACAO)),
+           centers = .$k,
+           nstart = 20) %>% 
+      glance()
+  )
+
+explorando_k %>% 
+  ggplot(aes(x = k, y = betweenss / totss)) +
+  geom_line() +
+  geom_point()
+
+```
+
+Observando o gráfico, a linha entre 0 e 4 cresce bastante, porém, depois do 4, o crescimento não é muito significativo, então, iremos escolher a quantidade de grupos como sendo 4 (k = 4).
+
+### K-means
+
+Vamos aplicar o algoritmo K-means com a quantidade de clusters sendo igual à 4.
+
+```{r}
+set.seed(31)
+
+n_clusters = 4
+
+km = ufcg_uas_sumario %>% 
+  select(-UORG_LOTACAO) %>% 
+  kmeans(centers = n_clusters, nstart = 20)
+
+unidades_agrupadas = km %>% 
+  augment(ufcg.scaled) %>% 
+  gather(key = "variável",
+         value = "valor",
+         -UORG_LOTACAO,
+         -.cluster)
+
+
+p = ggplot(unidades_agrupadas, aes(x=`variável`, 
+             y=valor,
+             text = paste("UA:",UORG_LOTACAO),
+             group = UORG_LOTACAO,
+             colour = .cluster)) +
+     labs(title = "Agrupamento")+
+    theme(legend.position="none") +
+  geom_point() + coord_flip() + facet_wrap(~ .cluster)
+ggplotly(p, tooltip = "text")
+
+```
+
+Os grupos se comportam de forma semelhante, mas podemos classificar da seguinte maneira:
+
+* **Grupo 1:** possui as unidades acadêmicas onde há os valores mais baixos em todas as variáveis. 
+    + Exemplos:
+        + Unidade Acadêmica Matemática e estatística
+        + Unidade Acadêmica de Letras
+        + Unidade Acadêmica de Desenho Industrial
+* **Grupo 2:** só possui duas unidades acadêmicas. As duas unidades se destacam por serem as que mais possuem professores com a carga horária de 20h semanais.
+    + Unidade Acadêmica de Medicina
+    + Unidade Acadêmica de Ciências da Vida
+* **Grupo 3:** possui as unidades acadêmicas onde os professores possuem o maior valor na variável *Idade 75 percentil*
+    + Exemplos:
+        + Unidade Acadêmica de Engenharia Química
+        + Unidade Acadêmica de Medicina Veterinária
+        + Unidade Acadêmica de Mineração e Geologia
+* **Grupo 4:** esse grupo se destaca na variável *Professor 40h ou DE*, pois os valores nessa variável são os maiores entre os 4 grupos.
+    + Exemplo:
+        + Unidade Acadêmica de Ciências Sociais
+        + Unidade Acadêmica de Direito
+        + Unidade Acadêmica de Enfermagem
+
+
+
