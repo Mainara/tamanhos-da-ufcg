@@ -165,7 +165,7 @@ explorando_k %>%
 
 ```
 
-Observando o gráfico, a linha entre 0 e 4 cresce bastante, porém, depois do 4, o crescimento não é muito significativo, então, iremos escolher a quantidade de grupos como sendo 4 (k = 4).
+Observando o gráfico, a linha entre 0 e 4 cresce bastante, porém, depois do 4, o crescimento não é muito significativo, então, iremos escolher a quantidade de grupos como sendo 4 *(k = 4)*.
 
 ### K-means
 
